@@ -1,0 +1,5 @@
+{
+  "name": "Personal Planner Calendar",
+  "description": "A spreadsheet-style personal calendar with monthly views and weekly summaries, inspired by professional planners.",
+  "requestFramePermissions": []
+}
