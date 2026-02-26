@@ -13,7 +13,9 @@ import {
   Save, 
   Trash2,
   Calendar as CalendarIcon,
-  Layout
+  Layout,
+  Download,
+  Upload
 } from 'lucide-react';
 import { Solar, HolidayUtil } from 'lunar-javascript';
 
@@ -242,6 +244,50 @@ export default function App() {
     setYearlyPlan(prev => ({ ...prev, [field]: value }));
   };
 
+  const handleExportData = () => {
+    const data = {
+      events,
+      summaries,
+      yearlyPlan,
+      exportDate: new Date().toISOString(),
+      version: '1.0'
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `calendar_backup_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportData = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const content = event.target?.result as string;
+        const data = JSON.parse(content);
+        
+        if (data.events) setEvents(data.events);
+        if (data.summaries) setSummaries(data.summaries);
+        if (data.yearlyPlan) setYearlyPlan(data.yearlyPlan);
+        
+        alert('数据导入成功！');
+      } catch (err) {
+        console.error('Import error:', err);
+        alert('导入失败：文件格式不正确');
+      }
+    };
+    reader.readAsText(file);
+    // Reset input
+    e.target.value = '';
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-white overflow-hidden">
       {/* Header */}
@@ -256,6 +302,25 @@ export default function App() {
         </div>
         
         <div className="flex items-center gap-2">
+          <button 
+            onClick={handleExportData}
+            className="p-2 text-slate-500 hover:bg-slate-100 rounded-md transition-colors flex items-center gap-1"
+            title="导出数据"
+          >
+            <Download size={18} />
+            <span className="hidden sm:inline text-xs">导出</span>
+          </button>
+          <label className="p-2 text-slate-500 hover:bg-slate-100 rounded-md transition-colors flex items-center gap-1 cursor-pointer" title="导入数据">
+            <Upload size={18} />
+            <span className="hidden sm:inline text-xs">导入</span>
+            <input 
+              type="file" 
+              accept=".json" 
+              className="hidden" 
+              onChange={handleImportData}
+            />
+          </label>
+          <div className="w-px h-4 bg-slate-200 mx-1" />
           {!isYearlyView && (
             <>
               <button 
@@ -457,7 +522,7 @@ export default function App() {
                                     >
                                       {event.completed && <Save size={8} className="stroke-[4]" />}
                                     </button>
-                                    <span className={`font-medium truncate ${event.completed ? 'text-slate-400' : 'text-slate-700'}`}>
+                                    <span className={`font-medium break-words whitespace-normal ${event.completed ? 'text-slate-400' : 'text-slate-700'}`}>
                                       {event.title}
                                     </span>
                                   </div>
@@ -563,13 +628,13 @@ export default function App() {
               <div className="p-6 space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">事项内容</label>
-                  <input 
+                  <textarea 
                     autoFocus
-                    type="text" 
+                    rows={3}
                     value={newEventTitle}
                     onChange={(e) => setNewEventTitle(e.target.value)}
                     placeholder="例如：产品周会"
-                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all resize-none"
                   />
                 </div>
                 
