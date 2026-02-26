@@ -105,6 +105,12 @@ export default function App() {
   const [newEventTitle, setNewEventTitle] = useState('');
   const [newEventTime, setNewEventTime] = useState('');
   const [newEventCompleted, setNewEventCompleted] = useState(false);
+  const [colWidths, setColWidths] = useState<number[]>(() => {
+    const saved = localStorage.getItem('calendar_col_widths');
+    return saved ? JSON.parse(saved) : [150, 150, 150, 150, 150, 150, 150, 250];
+  });
+  const [resizingIdx, setResizingIdx] = useState<number | null>(null);
+  const resizingRef = React.useRef<{ index: number; startX: number; startWidth: number } | null>(null);
 
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth();
@@ -137,6 +143,42 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem(`yearly_plan_${currentYear}`, JSON.stringify(yearlyPlan));
   }, [yearlyPlan, currentYear]);
+
+  useEffect(() => {
+    localStorage.setItem('calendar_col_widths', JSON.stringify(colWidths));
+  }, [colWidths]);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!resizingRef.current) return;
+      
+      const { index, startX, startWidth } = resizingRef.current;
+      const delta = e.clientX - startX;
+      const newWidth = Math.max(80, startWidth + delta);
+      
+      setColWidths(prev => {
+        const next = [...prev];
+        next[index] = newWidth;
+        return next;
+      });
+    };
+
+    const handleMouseUp = () => {
+      resizingRef.current = null;
+      document.body.style.cursor = '';
+      setResizingIdx(null);
+    };
+
+    if (resizingIdx !== null) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [resizingIdx]);
 
   const calendarDays = useMemo(() => {
     const daysInMonth = getDaysInMonth(currentYear, currentMonth);
@@ -243,6 +285,24 @@ export default function App() {
   const handleUpdateYearlyPlan = (field: keyof YearlyPlan, value: string) => {
     setYearlyPlan(prev => ({ ...prev, [field]: value }));
   };
+
+  const handleMouseDown = (e: React.MouseEvent, index: number) => {
+    e.preventDefault();
+    resizingRef.current = {
+      index,
+      startX: e.clientX,
+      startWidth: colWidths[index]
+    };
+    document.body.style.cursor = 'col-resize';
+    setResizingIdx(index);
+  };
+
+  const gridStyle = {
+    display: 'grid',
+    gridTemplateColumns: colWidths.map(w => `${w}px`).join(' ')
+  };
+
+  const totalWidth = useMemo(() => colWidths.reduce((a, b) => a + b, 0), [colWidths]);
 
   const handleExportData = () => {
     const data = {
@@ -409,23 +469,37 @@ export default function App() {
             </motion.div>
           </div>
         ) : (
-          <div className="min-w-[1200px]">
+          <div style={{ minWidth: totalWidth }}>
             {/* Header Row */}
-            <div className="calendar-grid sticky top-0 z-10 bg-white">
+            <div className="sticky top-0 z-10 bg-white" style={gridStyle}>
               {DAYS_CHINESE.map((day, idx) => (
                 <div 
                   key={day} 
-                  className="calendar-header text-slate-600 bg-slate-50"
+                  className="calendar-header text-slate-600 bg-slate-50 relative"
                 >
                   {day}
+                  <div 
+                    className="absolute top-0 -right-1 w-2 h-full cursor-col-resize z-20 group/resizer"
+                    onMouseDown={(e) => handleMouseDown(e, idx)}
+                  >
+                    <div className={`w-0.5 h-full mx-auto transition-colors ${resizingIdx === idx ? 'bg-indigo-500' : 'bg-transparent group-hover/resizer:bg-indigo-300'}`} />
+                  </div>
                 </div>
               ))}
-              <div className="calendar-header bg-[#f3e5f5] text-purple-700">周总结</div>
+              <div className="calendar-header bg-[#f3e5f5] text-purple-700 relative">
+                周总结
+                <div 
+                  className="absolute top-0 -right-1 w-2 h-full cursor-col-resize z-20 group/resizer"
+                  onMouseDown={(e) => handleMouseDown(e, 7)}
+                >
+                  <div className={`w-0.5 h-full mx-auto transition-colors ${resizingIdx === 7 ? 'bg-indigo-500' : 'bg-transparent group-hover/resizer:bg-indigo-300'}`} />
+                </div>
+              </div>
             </div>
 
             {/* Weeks */}
             {weeks.map((week, weekIdx) => (
-              <div key={weekIdx} className="calendar-grid">
+              <div key={weekIdx} style={gridStyle}>
                 {week.map((day, dayIdx) => {
                   const dateStr = day ? formatDate(currentYear, currentMonth, day) : null;
                   const dayEvents = events.filter(e => e.date === dateStr);
